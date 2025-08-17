@@ -1,0 +1,658 @@
+!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام إدارة الزيّ الموحد – WE</title>
+  <!-- SheetJS (Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{ --bg:#fafafa; --card:#fff; --text:#111; --muted:#6b7280; --primary:#6a1b9a; --primary-cta:#6a1b9a; --border:#e5e7eb }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, Arial; background:var(--bg); color:var(--text); }
+    header{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:5 }
+    h1{ margin:0; font-size:20px }
+    .btn{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer }
+    .btn.primary{ background:var(--primary-cta); color:#fff; border-color:transparent }
+    .container{ max-width:1200px; margin:20px auto; padding:0 16px }
+    .tabs{ display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:12px }
+    .tab-btn{ padding:10px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer }
+    .tab-btn.active{ background:var(--primary); color:#fff; border-color:transparent }
+    .card{ background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden }
+    .card .head{ padding:12px 14px; border-bottom:1px solid var(--border); font-weight:600 }
+    .card .body{ padding:14px }
+    .grid{ display:grid; gap:12px }
+    .grid.cols-3{ grid-template-columns: repeat(3, 1fr) }
+    .grid.cols-2{ grid-template-columns: repeat(2, 1fr) }
+    label{ display:block; font-size:13px; color:#374151; margin-bottom:6px }
+    input, select, textarea{ width:100%; padding:9px 10px; border:1px solid var(--border); border-radius:10px; background:#fff }
+    textarea{ resize:vertical; min-height:80px }
+    table{ width:100%; border-collapse:collapse; font-size:14px }
+    th, td{ padding:8px 10px; border-bottom:1px solid var(--border); text-align:right }
+    thead th{ background:#f9fafb; font-weight:600 }
+    .toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .muted{ color:var(--muted); font-size:12px }
+    .tag{ background:#f3f4f6; border:1px solid var(--border); padding:2px 8px; border-radius:999px; font-size:12px }
+    .danger{ color:#b91c1c }
+    .success{ color:#065f46 }
+    .hidden{ display:none }
+    .space-y > *{ margin-bottom:12px }
+    .help{ background:#fff7ed; border:1px solid #fed7aa; padding:10px; border-radius:10px; font-size:13px }
+    code{ background:#f3f4f6; padding:2px 6px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>نظام إدارة الزيّ الموحد – WE</h1>
+    <div class="toolbar">
+      <button class="btn" id="downloadTemplate">قالب Excel للطلبات</button>
+      <button class="btn" id="exportAll">تصدير كل البيانات</button>
+      <label class="btn" for="excelFile">رفع Excel</label>
+      <input id="excelFile" type="file" accept=".xlsx,.xls" class="hidden">
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="entry">إدخال الطلبات</button>
+      <button class="tab-btn" data-tab="supplier">صفحة المورد</button>
+      <button class="tab-btn" data-tab="inventory">المخزون</button>
+      <button class="tab-btn" data-tab="reports">تقارير</button>
+    </div>
+
+    <!-- ENTRY TAB -->
+    <section id="tab-entry" class="tab">
+      <div class="help" style="margin-bottom:12px">
+        <strong>تنسيق ملف Excel المطلوب:</strong>
+        الأعمدة: 
+        <code>employeeCode</code> (رقم العامل)، <code>employeeName</code> (الاسم)، <code>jobCategory</code> (الفئة: مبيعات/سائق/خدمة معاونة/فني إزالة أعطال)، <code>division</code> (اختياري)، <code>item</code> (نوع الزي)، <code>size</code> (المقاس)، <code>quantity</code> (الكمية)، <code>notes</code>.
+        إن لم تُذكر <code>division</code> سيتم تعيينها تلقائياً حسب الفئة.
+      </div>
+
+      <div class="grid cols-3">
+        <div class="card">
+          <div class="head">إدخال يدوي</div>
+          <div class="body space-y">
+            <div>
+              <label>رقم العامل</label>
+              <input id="empCode">
+            </div>
+            <div>
+              <label>اسم العامل</label>
+              <input id="empName">
+            </div>
+            <div>
+              <label>الفئة الوظيفية</label>
+              <select id="jobCategory"></select>
+            </div>
+            <div>
+              <label>النيابة/القطاع</label>
+              <select id="division"></select>
+              <div class="muted">* تُملأ تلقائياً من الفئة ويمكن تعديلها</div>
+            </div>
+            <div>
+              <label>وحدة الموقع</label>
+              <input id="unit" placeholder="مثال: رمسيس">
+            </div>
+            <div>
+              <label>نوع الزي المطلوب</label>
+              <select id="item"></select>
+            </div>
+            <div class="grid cols-2">
+              <div>
+                <label>المقاس</label>
+                <select id="size"></select>
+              </div>
+              <div>
+                <label>الكمية</label>
+                <input id="qty" type="number" min="1" value="1">
+              </div>
+            </div>
+            <div>
+              <label>ملاحظات</label>
+              <textarea id="notes"></textarea>
+            </div>
+            <button class="btn primary" id="addRequest">إضافة</button>
+            <div class="muted">يمكن أيضًا رفع ملف Excel بالأعمدة المذكورة أعلاه.</div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+          <div class="head">الطلبات المُسجلة</div>
+          <div class="body">
+            <div class="toolbar" style="margin-bottom:8px">
+              <input id="searchReq" placeholder="بحث سريع" style="max-width:220px">
+            </div>
+            <div style="overflow:auto">
+              <table id="reqTable">
+                <thead>
+                  <tr>
+                    <th>رقم العامل</th>
+                    <th>الاسم</th>
+                    <th>الفئة الوظيفية</th>
+                    <th>النيابة</th>
+                    <th>وحدةالموقع</th>
+                    <th>نوع الزي</th>
+                    <th>المقاس</th>
+                    <th>الكمية</th>
+                    <th>ملاحظات</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUPPLIER TAB -->
+    <section id="tab-supplier" class="tab hidden">
+      <div class="card">
+        <div class="head">تجميع الكميات للمورد حسب (النيابة/الصنف/المقاس)</div>
+        <div class="body">
+          <div style="overflow:auto">
+            <table id="supplierTable">
+              <thead>
+                <tr>
+                  <th>النيابة</th>
+                  <th>الصنف</th>
+                  <th>المقاس</th>
+                  <th>الكمية المطلوبة</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVENTORY TAB -->
+    <section id="tab-inventory" class="tab hidden">
+      <div class="grid cols-3">
+        <div class="card">
+          <div class="head">حركة مخزون (وارد/منصرف)</div>
+          <div class="body space-y">
+            <div>
+              <label>تاريخ</label>
+              <input id="invDate" type="date">
+            </div>
+            <div>
+              <label>النيابة/القطاع</label>
+              <select id="invDivision"></select>
+            </div>
+            <div>
+              <label>الصنف</label>
+              <select id="invItem"></select>
+            </div>
+            <div>
+              <label>المقاس</label>
+              <select id="invSize"></select>
+            </div>
+            <div class="grid cols-2">
+              <div>
+                <label>وارد (+)</label>
+                <input id="qtyIn" type="number" min="0" value="0">
+              </div>
+              <div>
+                <label>منصرف (−)</label>
+                <input id="qtyOut" type="number" min="0" value="0">
+              </div>
+            </div>
+            <div>
+              <label>مرجع/ملاحظة</label>
+              <input id="invRef" placeholder="مثال: فاتورة 123 / محضر تسليم">
+            </div>
+            <button class="btn primary" id="addInv">تسجيل الحركة</button>
+            <div class="muted">لن يسمح بصرف كمية تجعل المخزون بالسالب.</div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+          <div class="head">رصيد المخزون الحالي حسب (النيابة/الصنف/المقاس)</div>
+          <div class="body">
+            <div style="overflow:auto">
+              <table id="stockTable">
+                <thead>
+                  <tr>
+                    <th>النيابة</th>
+                    <th>الصنف</th>
+                    <th>المقاس</th>
+                    <th>الرصيد</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="head">سجل الحركات</div>
+        <div class="body">
+          <div style="overflow:auto">
+            <table id="invTable">
+              <thead>
+                <tr>
+                  <th>التاريخ</th>
+                  <th>النيابة</th>
+                  <th>الصنف</th>
+                  <th>المقاس</th>
+                  <th>وارد</th>
+                  <th>منصرف</th>
+                  <th>مرجع</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS TAB -->
+    <section id="tab-reports" class="tab hidden">
+      <div class="card">
+        <div class="head">تقارير بالتواريخ</div>
+        <div class="body">
+          <div class="toolbar" style="margin-bottom:12px">
+            <div>
+              <label>من تاريخ</label>
+              <input id="rFrom" type="date">
+            </div>
+            <div>
+              <label>إلى تاريخ</label>
+              <input id="rTo" type="date">
+            </div>
+            <button class="btn" id="runReports">تحديث التقارير</button>
+            <button class="btn" id="exportReports">تصدير التقارير Excel</button>
+          </div>
+
+          <h3>1) ما تم صرفه من المورد (الوارد إلى المخزن)</h3>
+          <div style="overflow:auto; margin-bottom:16px">
+            <table id="repSupplierIn">
+              <thead>
+                <tr>
+                  <th>النيابة</th>
+                  <th>الصنف</th>
+                  <th>المقاس</th>
+                  <th>الكمية الواردة</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <h3>2) ما تم صرفه من المخزن للنيابات (منصرف)</h3>
+          <div style="overflow:auto">
+            <table id="repWarehouseOut">
+              <thead>
+                <tr>
+                  <th>النيابة</th>
+                  <th>الصنف</th>
+                  <th>المقاس</th>
+                  <th>الكمية المنصرفة</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ======== الفئات المطلوبة ========
+
+    const JOB_TO_DIVISION = {
+      'مبيعات': 'الشئون التجارية',
+      'سائق': 'السائقون_شركة',
+      'خدمة معاونة': 'خدمة_معاونة_شركة',
+      'فني إزالة أعطال': 'شئون المناطق',
+    };
+
+    const JOB_CATEGORIES = Object.keys(JOB_TO_DIVISION);
+
+    const DIVISIONS = [
+      { id: "الشئون التجارية", label: "نيابة الشئون التجارية" },
+      { id: "شئون المناطق", label: "نيابة شئون المناطق" },
+      { id: "الأمن", label: "قطاع الأمن - على مستوى الشركة" },
+      { id: "السائقون_شركة", label: "السائقون - على مستوى الشركة" },
+      { id: "خدمة_معاونة_شركة", label: "خدمة معاونة - على مستوى الشركة" },
+    ];
+
+    const SIZE_OPTIONS = ["XS","S","M","L","XL","2XL","3XL","4XL","5XL"];
+
+    const ITEMS_BY_DIVISION = {
+      "الشئون التجارية": [
+        "قميص رجالى","بلوفر رجالى","جاكيت رجالى","بلوزه حريمى","جاكت حريمى","بولو شيرت","كاريديجان حريمى","بنطلون رجالى","جيب حريمى","ايشارب موف حريمى"
+      ],
+      "شئون المناطق": ["تيشيرت شتوي","تيشرت صيفي","بنطلون جينز","جاكيت","كوتش"],
+      "الأمن": ["بدله رجالى كحلى","قميص رجالى ابيض","قميص رحالى لبنى","بنطلون جبردين محلى","حزاء جلد اسود","فيست موف صوف","رابطه عنق موف"],
+      "السائقون_شركة": ["بولو صيفى","بولو شتوى","جاكيت","كتشى","بنطلون جينز"],
+      "السائقون_النواب": ["بدله اسود","قميص","فيست","كرافت","حذاء اسود"],
+      "خدمة_معاونة_النواب": ["بدله سوداء","قميص","فيست","كرافت","حذاء اسود"],
+      "خدمة_معاونة_شركة": ["قميص","بنطلول","بلوفر رجالى","رابطه عنق","حذاء"],
+    };
+    const LS_KEY = 'we-uniform-state-v3';
+
+    let requests = [];
+    let inventory = [];
+
+    function loadState(){
+      try{ const raw = localStorage.getItem(LS_KEY); if(raw){ const s = JSON.parse(raw); requests=s.requests||[]; inventory=s.inventory||[]; }}catch{}
+    }
+    function saveState(){
+      try{ localStorage.setItem(LS_KEY, JSON.stringify({requests, inventory})); }catch{}
+    }
+
+    // ======== عناصر DOM ========
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabs = {
+      entry: document.getElementById('tab-entry'),
+      supplier: document.getElementById('tab-supplier'),
+      inventory: document.getElementById('tab-inventory'),
+      reports: document.getElementById('tab-reports'),
+    };
+
+    const ddJob = document.getElementById('jobCategory');
+    const ddDivision = document.getElementById('division');
+    const ddItem = document.getElementById('item');
+    const ddSize = document.getElementById('size');
+    const txtUnit = document.getElementById('unit');
+    const txtEmpCode = document.getElementById('empCode');
+    const txtEmpName = document.getElementById('empName');
+    const txtQty = document.getElementById('qty');
+    const txtNotes = document.getElementById('notes');
+    const btnAddRequest = document.getElementById('addRequest');
+    const reqTableBody = document.querySelector('#reqTable tbody');
+    const searchReq = document.getElementById('searchReq');
+
+   const supplierTableBody = document.querySelector('#supplierTable tbody');
+
+  const invDate = document.getElementById('invDate');
+  const invDivision = document.getElementById('invDivision');
+  const invItem = document.getElementById('invItem');
+  const invSize = document.getElementById('invSize');
+  const qtyIn = document.getElementById('qtyIn');
+  const qtyOut = document.getElementById('qtyOut');
+  const invRef = document.getElementById('invRef');
+  const btnAddInv = document.getElementById('addInv');
+  const stockTableBody = document.querySelector('#stockTable tbody');
+  const invTableBody = document.querySelector('#invTable tbody');
+
+  const btnTemplate = document.getElementById('downloadTemplate');
+  const btnExportAll = document.getElementById('exportAll');
+  const fileExcel = document.getElementById('excelFile');
+
+  // Reports DOM
+  const rFrom = document.getElementById('rFrom');
+  const rTo = document.getElementById('rTo');
+  const runReports = document.getElementById('runReports');
+  const exportReports = document.getElementById('exportReports');
+  const repSupplierInBody = document.querySelector('#repSupplierIn tbody');
+  const repWarehouseOutBody = document.querySelector('#repWarehouseOut tbody');
+
+  // ======== تبويب ========
+  tabBtns.forEach(b=>{ b.addEventListener('click', ()=>{
+    tabBtns.forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    Object.values(tabs).forEach(s=> s.classList.add('hidden'));
+    const name = b.dataset.tab; tabs[name].classList.remove('hidden');
+    if(name==='supplier') renderSupplier();
+    if(name==='inventory'){ renderStock(); renderInvLog(); fillInvSelectors(); }
+    if(name==='reports'){ renderReports(); }
+  }) });
+
+  // ======== تعبئة القوائم ========
+  function fillJobCategories(){ ddJob.innerHTML = '<option value="">—</option>' + JOB_CATEGORIES.map(j=>`<option>${j}</option>`).join(''); }
+  function fillDivisions(select){
+    select.innerHTML = '<option value="">—</option>' + DIVISIONS.map(d=>`<option value="${d.id}">${d.label}</option>`).join('');
+  }
+  function fillSizes(select){ select.innerHTML = '<option value="">—</option>' + SIZE_OPTIONS.map(s=>`<option>${s}</option>`).join(''); }
+  function fillItemsForDivision(select, division){
+    const arr = ITEMS_BY_DIVISION[division]||[];
+    select.innerHTML = '<option value="">—</option>' + arr.map(x=>`<option>${x}</option>`).join('');
+  }
+  ddJob.addEventListener('change', ()=>{
+    const job = ddJob.value; const mapped = JOB_TO_DIVISION[job] || '';
+    if(mapped){ ddDivision.value = mapped; fillItemsForDivision(ddItem, mapped); }
+  });
+  ddDivision.addEventListener('change', ()=>{ fillItemsForDivision(ddItem, ddDivision.value); });
+  function fillEntrySelectors(){ fillJobCategories(); fillDivisions(ddDivision); fillSizes(ddSize); fillItemsForDivision(ddItem, ddDivision.value); }
+  function fillInvSelectors(){ fillDivisions(invDivision); fillSizes(invSize); fillItemsForDivision(invItem, invDivision.value); }
+  invDivision.addEventListener('change', ()=> fillItemsForDivision(invItem, invDivision.value));
+
+  // ======== طلبات: إضافة/حذف/عرض ========
+  btnAddRequest.addEventListener('click', () => {
+    const jobCategory = ddJob.value;
+    const division = ddDivision.value;
+    const unit = txtUnit.value.trim();
+    const employeeCode = txtEmpCode.value.trim();
+    const employeeName = txtEmpName.value.trim();
+    const item = ddItem.value;
+    const size = ddSize.value;
+    const quantity = Number(txtQty.value || 0);
+    const notes = txtNotes.value.trim();
+
+    if (!employeeCode || !employeeName || !jobCategory || !item || !size || quantity <= 0) {
+        alert('برجاء استكمال الحقول الأساسية: رقم/اسم العامل، الفئة الوظيفية، الصنف، المقاس، الكمية.');
+        return;
+    }
+
+    const existingRequest = requests.find(r => r.employeeCode === employeeCode && r.division !== division);
+    if (existingRequest) {
+        alert('رقم العامل هذا موجود بالفعل في نيابة أخرى. لا يمكن تكرار رقم العامل في نيابتين مختلفتين.');
+        return;
+    }
+
+    const divFinal = division || (JOB_TO_DIVISION[jobCategory] || '');
+    if (!divFinal) {
+        alert('حدد النيابة/القطاع أو اختر فئة وظيفية معروفة.');
+        return;
+    }
+
+    const row = { id: crypto.randomUUID(), jobCategory, division: divFinal, unit, employeeCode, employeeName, item, size, quantity, notes };
+    requests.push(row);
+    saveState();
+    renderRequests();
+    renderSupplier();
+    txtQty.value = 1;
+    txtNotes.value = '';
+});
+  function renderRequests(){
+    const q = (searchReq.value||'').trim();
+    const rows = q ? requests.filter(r=> Object.values(r).some(v=> String(v).includes(q))) : requests;
+    reqTableBody.innerHTML = rows.map(r=>`
+      <tr>
+         <td>${r.employeeCode||''}</td>
+        <td>${r.employeeName||''}</td>
+         <td>${r.jobCategory||''}</td>
+         <td>${r.division||''}</td>
+         <td>${r.unit||''}</td>
+        <td>${r.item}</td>
+        <td>${r.size}</td>
+        <td>${r.quantity}</td>
+        <td>${r.notes||''}</td>
+        <td><button class="btn" data-del="${r.id}">حذف</button></td>
+      </tr>
+      
+    `).join('');
+    reqTableBody.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ const id = btn.getAttribute('data-del'); requests = requests.filter(x=> x.id!==id); saveState(); renderRequests(); renderSupplier(); });
+    })
+  }
+  searchReq.addEventListener('input', renderRequests);
+
+  // ======== تجميع المورد ========
+  function aggregateForSupplier(){
+    const map = new Map();
+    for(const r of requests){
+      const key = `${r.division}||${r.item}||${r.size}`;
+      map.set(key, (map.get(key)||0) + Number(r.quantity||0));
+    }
+    return Array.from(map.entries()).map(([k,q])=>{ const [division,item,size] = k.split('||'); return {division,item,size,quantity:q}; })
+      .sort((a,b)=> a.division.localeCompare(b.division,'ar') || a.item.localeCompare(b.item,'ar'));
+  }
+  function renderSupplier(){
+    const agg = aggregateForSupplier();
+    supplierTableBody.innerHTML = agg.map(r=>`
+      <tr>
+        <td>${r.division}</td>
+        <td>${r.item}</td>
+        <td>${r.size}</td>
+        <td><strong>${r.quantity}</strong></td>
+      </tr>
+    `).join('');
+  }
+  // ======== المخزون ========
+  btnAddInv.addEventListener('click', ()=>{
+    const row = {
+      id: crypto.randomUUID(),
+      date: invDate.value, division: invDivision.value, item: invItem.value, size: invSize.value,
+      qtyIn: Number(qtyIn.value||0), qtyOut: Number(qtyOut.value||0), ref: invRef.value.trim()
+    };
+    if(!row.division || !row.item || !row.size){ alert('اختر النيابة والصنف والمقاس.'); return; }
+    if(!(row.qtyIn || row.qtyOut)){ alert('أدخل وارد أو منصرف.'); return; }
+    const current = getStock(row.division,row.item,row.size);
+    const would = current + row.qtyIn - row.qtyOut;
+    if(would < 0){ alert('لا توجد كمية كافية بالمخزون.'); return; }
+    inventory.push(row); saveState();
+    renderStock(); renderInvLog();
+    qtyIn.value = 0; qtyOut.value = 0; invRef.value = '';
+  });
+
+  function getStock(division,item,size){
+    let sum = 0; for(const t of inventory){ if(t.division===division && t.item===item && t.size===size){ sum += Number(t.qtyIn||0) - Number(t.qtyOut||0); }} return sum;
+  }
+
+  function renderStock(){
+    const keys = new Set();
+    for(const t of inventory){ keys.add(`${t.division}||${t.item}||${t.size}`); }
+    const rows = Array.from(keys).map(k=>{
+      const [division,item,size] = k.split('||');
+      return { division,item,size, stock: getStock(division,item,size) };
+    }).sort((a,b)=> a.division.localeCompare(b.division,'ar') || a.item.localeCompare(b.item,'ar'));
+
+    stockTableBody.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${r.division}</td>
+        <td>${r.item}</td>
+        <td>${r.size}</td>
+        <td><strong class="${r.stock<0?'danger':'success'}">${r.stock}</strong></td>
+      </tr>
+    `).join('');
+  }
+
+  function renderInvLog(){
+    invTableBody.innerHTML = inventory.map(t=>`
+      <tr>
+        <td>${t.date||''}</td>
+        <td>${t.division}</td>
+        <td>${t.item}</td>
+        <td>${t.size}</td>
+        <td>${t.qtyIn||0}</td>
+        <td>${t.qtyOut||0}</td>
+        <td>${t.ref||''}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ======== Excel: قالب/تصدير/استيراد ========
+  btnTemplate.addEventListener('click', ()=>{ 
+    const rows = [
+      ["employeeCode","employeeName","jobCategory","division","item","size","quantity","notes"],
+      ["1001","أحمد علي","مبيعات","","قميص رجالى","L",2,""]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'RequestsTemplate');
+    XLSX.writeFile(wb, 'WE-Uniform-Requests-Template.xlsx');
+  });
+
+  btnExportAll.addEventListener('click', ()=>{ 
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(requests), 'Requests');
+    const supp = aggregateForSupplier();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(supp), 'Supplier_Aggregation');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inventory), 'Inventory');
+    XLSX.writeFile(wb, 'WE-Uniform-Data.xlsx');
+  });
+
+  fileExcel.addEventListener('change', (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt)=>{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const rows = json.map(r=>{
+        const jobCategory = String(r.jobCategory||'').trim();
+        let division = String(r.division||'').trim();
+        if(!division && jobCategory && JOB_TO_DIVISION[jobCategory]){ division = JOB_TO_DIVISION[jobCategory]; }
+        return {
+          id: crypto.randomUUID(),
+          employeeCode: String(r.employeeCode||'').trim(),
+          employeeName: String(r.employeeName||'').trim(),
+          jobCategory,
+          division,
+          unit: String(r.unit||'').trim(),
+          item: String(r.item||'').trim(),
+          size: String(r.size||'').trim(),
+          quantity: Number(r.quantity||0),
+          notes: String(r.notes||'').trim(),
+        };
+      }).filter(r=> r.employeeCode && r.employeeName && r.jobCategory && r.item && r.size && r.quantity>0 && (r.division||JOB_TO_DIVISION[r.jobCategory]));
+      rows.forEach(r=>{ if(!r.division){ r.division = JOB_TO_DIVISION[r.jobCategory]; }});
+      requests = requests.concat(rows); saveState(); renderRequests(); renderSupplier();
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ======== تقارير بالتاريخ ========
+  function parseDate(d){ return d ? new Date(d + 'T00:00:00') : null; }
+  function inRange(dateStr, dFrom, dTo){
+    if(!dateStr) return false; const d = parseDate(dateStr); if(!d) return false;
+    if(dFrom && d < dFrom) return false; if(dTo && d > dTo) return false; return true;
+  }
+
+  function groupMovements(filterFn){
+    const mapIn = new Map();
+    const mapOut = new Map();
+    for(const t of inventory){
+      if(!filterFn(t)) continue;
+      const key = `${t.division}||${t.item}||${t.size}`;
+      if(t.qtyIn){ mapIn.set(key, (mapIn.get(key)||0) + Number(t.qtyIn)); }
+      if(t.qtyOut){ mapOut.set(key, (mapOut.get(key)||0) + Number(t.qtyOut)); }
+    }
+    const toRows = (m)=> Array.from(m.entries()).map(([k,q])=>{ const [division,item,size] = k.split('||'); return {division,item,size,quantity:q}; })
+      .sort((a,b)=> a.division.localeCompare(b.division,'ar') || a.item.localeCompare(b.item,'ar'));
+    return { inRows: toRows(mapIn), outRows: toRows(mapOut) };
+  }
+
+  function renderReports(){
+    const dFrom = parseDate(rFrom.value);
+    const dTo = parseDate(rTo.value);
+    const { inRows, outRows } = groupMovements(t=> inRange(t.date, dFrom, dTo));
+    repSupplierInBody.innerHTML = inRows.map(r=>`<tr><td>${r.division}</td><td>${r.item}</td><td>${r.size}</td><td><strong>${r.quantity}</strong></td></tr>`).join('');
+    repWarehouseOutBody.innerHTML = outRows.map(r=>`<tr><td>${r.division}</td><td>${r.item}</td><td>${r.size}</td><td><strong>${r.quantity}</strong></td></tr>`).join('');
+    if(!inRows.length) repSupplierInBody.innerHTML = '<tr><td colspan="4" class="muted">لا توجد وارد خلال الفترة</td></tr>';
+    if(!outRows.length) repWarehouseOutBody.innerHTML = '<tr><td colspan="4" class="muted">لا توجد منصرف خلال الفترة</td></tr>';
+  }
+  runReports.addEventListener('click', renderReports);
+
+  exportReports.addEventListener('click', ()=>{ const dFrom = rFrom.value || ''; const dTo = rTo.value || ''; const { inRows, outRows } = groupMovements(t=> inRange(t.date, parseDate(dFrom), parseDate(dTo))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(inRows), `Supplier_In_${dFrom}_${dTo}`); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(outRows), `Warehouse_Out_${dFrom}_${dTo}`); XLSX.writeFile(wb, `WE-Uniform-Reports-${dFrom}-${dTo}.xlsx`); });
+
+  // ======== بدء التشغيل ========
+  function init(){ loadState(); fillEntrySelectors(); fillInvSelectors(); renderRequests(); renderSupplier(); renderStock(); renderInvLog(); }
+  init();
+  </script>
+</body>
+</html>
